@@ -32,9 +32,9 @@ class Server:
         return is_success
         
     def removeFunction(self, function):
-        self.availableCPU -= function.cpu
-        self.availableMEM -= function.mem
-        self.availableBW -= function.bw
+        self.availableCPU += function.cpu
+        self.availableMEM += function.mem
+        self.availableBW += function.bw
 
 class DataCenter:
     def __init__(self, k):
