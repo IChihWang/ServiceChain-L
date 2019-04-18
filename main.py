@@ -17,6 +17,7 @@ if __name__ == "__main__":
     
     # Start simulation
     for t_idx in range(cfg.SIMU_TIME-1):
+        print(t_idx)
         # 1. handle finished chain
         for chain in (event_list[t_idx]['finish']):
             data_center.removeChain(chain)
@@ -36,7 +37,8 @@ if __name__ == "__main__":
         
         # 3. handle arrival chain
         for chain in (event_list[t_idx]['arrive']):
-            is_success = data_center.assignChain(chain)
+            #is_success = data_center.assignChainRL(chain)
+            is_success = data_center.assignChainBF(chain)
             
             if is_success:
                 # Insert finish event
