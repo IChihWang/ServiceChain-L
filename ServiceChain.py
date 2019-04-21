@@ -1,5 +1,6 @@
 import config as cfg
 from random import randrange
+import random
 
 
 class ServiceFunction:
@@ -39,12 +40,16 @@ def DummyGenChains():
     testSet = []
     
     num_chain = randrange(100)
+    print("num_chain", num_chain)
     num_function_chain = randrange(1,10)
-    
+    num_function_chain = 3
+    print("Waring !! Fix num_function_chain Now !!")
+
+    #print("num_function_chain", num_function_chain)
     for idx in range(num_chain):
         functs = []
         for jdx in range(num_function_chain):
-            functs.append(ServiceFunction(1, 2, 3))
+            functs.append(ServiceFunction(40, 55, 35))
         chain = ServiceChain(100, 5, randrange(cfg.SIMU_TIME-10), functs)
         
         testSet.append(chain)
