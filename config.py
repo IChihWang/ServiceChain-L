@@ -1,6 +1,6 @@
 
 ### Setting of the simulation
-SIMU_TIME = 1000
+SIMU_TIME = 100
 
 ### Setting of the data center
 CPU_MAX = 100

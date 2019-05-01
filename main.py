@@ -8,7 +8,7 @@ if __name__ == "__main__":
     chains = DummyGenChains()
     
     # list of queue of event of chain arrival and finishes
-    event_list = [  {'arrive':[], 'finish':[], 'queue':[]} for idx in range(cfg.SIMU_TIME)]
+    event_list = [  {'arrive':[], 'finish':[], 'queue':[]} for idx in range(cfg.SIMU_TIME*2)]
     
     for chain in chains:
         t_idx = chain.arrive_time
@@ -24,7 +24,7 @@ if __name__ == "__main__":
             
         # 2. handle queued chain
         for chain in (event_list[t_idx]['queue']):
-            is_success = data_center.assignChain(chain)
+            is_success = data_center.assignChainO2AI(chain)
             
             if is_success:
                 # Insert finish event
@@ -38,7 +38,7 @@ if __name__ == "__main__":
         # 3. handle arrival chain
         for chain in (event_list[t_idx]['arrive']):
             #is_success = data_center.assignChainRL(chain)
-            is_success = data_center.assignChainBF(chain)
+            is_success = data_center.assignChainO2AI(chain)
             
             if is_success:
                 # Insert finish event
