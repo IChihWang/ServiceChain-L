@@ -14,6 +14,8 @@ class State:
         self.ep_ret = 0
         self.wall_time = 0
         self.episode_counter = 0
+        self.finishtimes = 0
+        self.chain_cnt = 0
 
     def get_obs(self):
 
@@ -24,15 +26,53 @@ class State:
 
     def construct_chain_state(self, chain_state):
         # state of One chain's function
+        mu = np.mean(chain_state)
+        var = np.var(chain_state)
+        #chain_state = (chain_state-mu)/var
         self.chain_state = chain_state
+        self.chain_state_ptr = 0
 
     def construct_server_state(self, servers):
         state = [(a.availableCPU, a.availableMEM, a.availableBW, a.delayFactor) for a in servers]
         state = np.asarray(state)
+        state = state.astype(float)
+        mu = 100 #np.mean(state[:,0:-1])
+        var = np.var(state[:,0:-1]) + 0.0001
+        #print(mu,var)
+        #exit()
+        state[:,0:-1] = (state[:,0:-1]-mu)/var
+        #state[:, 0:-1] = state[:, 0:-1]/100.0
+        #print(type(state))
+        #print("serverstate:", state)
         self.server_state = state
+
+    def norm2_reward(self, servers):
+        state = [(a.availableCPU, a.availableMEM, a.availableBW) for a in servers]
+        state = np.asarray(state)
+        state = state.astype(float)
+        state[:,0] = state[:,0]/self.server_max[0]
+        state[:, 1] = state[:, 1] / self.server_max[1]
+        state[:, 2] = state[:, 2] / self.server_max[2]
+        state = np.square(state)
+
+        return np.sum(state)/10.0
+
+
+    def update_server_max(self, servers):
+        state = [(a.availableCPU, a.availableMEM, a.availableBW) for a in servers]
+        #max(state)
+        state = np.asarray(state)
+        state = state.astype(float)
+        self.server_max = (max(state[:,0]), max(state[:,1]),max(state[:,2]))
+        #print(self.server_max)
+
 
     def step(self):
         self.counter += 1
+        self.chain_state[self.chain_state_ptr] = 0
+        self.chain_state_ptr += 1
+        #print(self.chain_state)
+        #exit()
 
 
     def update_wall_time(self):
@@ -41,6 +81,11 @@ class State:
     def reset(self):
         self.ep_ret = 0
         self.counter = 0
+        self.finishtimes += 1
+        self.chain_cnt = 0
+
+    def update_chain_cnt(self):
+        self.chain_cnt += 1
 
 
 
@@ -93,6 +138,10 @@ class DataCenter:
         self.initDelayFactor()
 
         # Try to deploy the chain
+        env.update_server_max(self.servers)
+
+        #env.norm2_reward(self.servers)
+        env.update_chain_cnt()
         for function_idx in range(len(chain.serviceFunctions)):
 
             target_function = chain.serviceFunctions[function_idx]
@@ -104,7 +153,7 @@ class DataCenter:
             #RLstate = self.constructRLstate(self.servers)
             env.construct_server_state(self.servers)
             rl_state = env.get_obs()
-            #print("get_obs", rl_state.shape)
+            #print("get_obs", rl_state)
             #exit()
 
 
@@ -119,7 +168,8 @@ class DataCenter:
             if use_dummy:
                 server_idx = DummyAlgorithm(target_function, rl_state)
             target_server = self.servers[server_idx]
-
+            #print(target_server.index)
+            #exit()
 
             # Try to deploy the function
             if (chain.current_latency_req >= target_server.delayFactor):
@@ -134,7 +184,7 @@ class DataCenter:
             if is_deployed:
                 reward = 0
             else:
-                reward = -1
+                reward = -10
             agent.buf.store(rl_state, a, reward, v_t, logp_t)
 
 
@@ -142,7 +192,7 @@ class DataCenter:
                 # Record the server idx on function if deployment succeed
                 target_function.server_idx = server_idx
                 chain.current_latency_req -= target_server.delayFactor
-                # Update delay factor
+                # Update delay factorz
                 self.updateDelayFactor(server_idx)
 
 
@@ -162,7 +212,8 @@ class DataCenter:
             #print("success")
             # If deploy chain sucessfully
             self.chains.append(chain)
-            reward = 1
+            reward = 10
+            reward = env.norm2_reward(self.servers)
             agent.buf.overwrite_last_rew(reward)
             env.ep_ret += reward
 
@@ -175,15 +226,20 @@ class DataCenter:
             #return False
 
         # assume infinte horizon now
-        if env.counter > 400:
+        magic = 100#np.random.randint(20, 66)
 
+        #if env.counter > magic :
+        if env.chain_cnt >5:
             terminal = True
             last_val = agent.sess.run(agent.v, feed_dict={agent.x_ph: rl_state.reshape(1, -1)})
             agent.buf.finish_path(last_val)
             env.episode_counter += 1
             agent.log_tf(env.ep_ret, 'Return', env.episode_counter)
             print('Return:', env.ep_ret)
-            agent.update()
+
+            if env.finishtimes % 5 == 0:
+                print("!!!!!!!!!!!!Update")
+                agent.update()
             #print("Doing update:", env.episode_counter)
             env.reset()
 
@@ -196,6 +252,10 @@ class DataCenter:
         self.initDelayFactor()
 
         # Try to deploy the chain
+        env.update_server_max(self.servers)
+
+        #env.norm2_reward(self.servers)
+        env.update_chain_cnt()
         for function_idx in range(len(chain.serviceFunctions)):
 
             target_function = chain.serviceFunctions[function_idx]
@@ -232,7 +292,8 @@ class DataCenter:
             if is_deployed:
                 reward = 0
             else:
-                reward = -1
+                print("Fail")
+                reward = -10
 
             if is_deployed:
                 # Record the server idx on function if deployment succeed
@@ -254,12 +315,14 @@ class DataCenter:
                 break
 
         if is_success:
-            print("success")
+            #print("success")
             # If deploy chain sucessfully
             self.chains.append(chain)
-            reward = 1
+            reward = 10
+            reward = env.norm2_reward(self.servers)
             agent.buf.overwrite_last_rew(reward)
             env.ep_ret += reward
+
             #return True
 
         else:
@@ -267,12 +330,19 @@ class DataCenter:
             env.ep_ret += reward
             #return False
 
-        # assume infinte horizon now
-        if env.counter > 200:
+        if env.chain_cnt >5:
+
             env.episode_counter += 1
+
+            print('Return:', env.ep_ret)
+
             env.reset()
 
         return is_success
+
+
+
+
 
 
 

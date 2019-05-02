@@ -45,7 +45,7 @@ def DummyGenChains():
     num_function_chain = 3
     print("Waring !! Fix num_function_chain Now !!")
 
-    #print("num_function_chain", num_function_chain)
+    #∂çprint("num_function_chain", num_function_chain)
     for idx in range(num_chain):
         functs = []
         for jdx in range(num_function_chain):

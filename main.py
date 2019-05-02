@@ -132,7 +132,7 @@ def train():
 
             # 2. handle queued chain
             # start = time.time()
-            # get_all_func(event_list[t_idx]['queue'])
+            # get_all_func(event_list[t_idx]['queue'])123
             # get_all_func(event_list[t_idx]['arrive'])
 
             # end = time.time()
@@ -178,6 +178,9 @@ def train():
             waiting_list = [chain.waitingTime if chain.finish_time is not None else 1000 for chain in chains]
             agent.log_tf(sum(waiting_list) / len(waiting_list), tag='Avg Waiting Time', step_counter= epoch)
             logger.info("Epoch{}, Avg waiting time{}".format(epoch, sum(waiting_list) / len(waiting_list)))
+            logger.info(waiting_list)
+            #arrive_list = [chain.arrive_time for chain in chains]
+            #logger.info(arrive_list)
             print("Average waiting time is ", len(waiting_list), sum(waiting_list) / len(waiting_list))
 
         if epoch % cfg.Save_Model_Epoch == 0:
@@ -188,7 +191,7 @@ def train():
 
 
 
-def eval():
+def eval(use_dummy=True):
     #random.seed(7)
     #data_center = DataCenter(6)
     #chains = DummyGenChains()
@@ -236,7 +239,7 @@ def eval():
                 env.construct_chain_state(chain_state)
 
                 # step(a)
-                is_success = data_center.assignChain_eval(chain, env, agent, True)
+                is_success = data_center.assignChain_eval(chain, env, agent, use_dummy)
 
                 if is_success:
                     # Insert finish event
@@ -254,7 +257,7 @@ def eval():
                 chain_state = get_func_in_chain(chain)
                 env.construct_chain_state(chain_state)
 
-                is_success = data_center.assignChain_eval(chain, env, agent, True)
+                is_success = data_center.assignChain_eval(chain, env, agent, use_dummy)
 
                 if is_success:
                     # Insert finish event
@@ -275,7 +278,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--load', type=str, default=None)
-    parser.add_argument('--pi_lr', type=float, default=1e-3)
+    parser.add_argument('--pi_lr', type=float, default=1e-4)
     parser.add_argument('--v_lr', type=float, default=1e-3)
     config_rl = parser.parse_args()
 
@@ -289,10 +292,13 @@ if __name__ == "__main__":
     if config_rl.load:
         agent.load_model()
         print("load")
-    chains = train()
-    #chains = eval()
+    #chains = train()
+    chains = eval(False)
 
     # Results
     waiting_list = [chain.waitingTime if chain.finish_time is not None else 1000 for chain in chains]
     print(waiting_list)
     print("Average waiting time is ", len(waiting_list), sum(waiting_list) / len(waiting_list))
+
+    arrive_list = [chain.arrive_time for chain in chains]
+    print("arrive_list", arrive_list)

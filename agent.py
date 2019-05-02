@@ -97,7 +97,7 @@ class VPGBuffer:
 
 
 class Agent():
-    def __init__(self, state_dim, action_dim, config_rl, gamma=0.99, train_v_iters=10, steps_per_epoch=1000, lam=0.97):
+    def __init__(self, state_dim, action_dim, config_rl, gamma=0.9, train_v_iters=2, steps_per_epoch=1000, lam=0.97):
 
         self.global_step = tf.train.get_or_create_global_step(graph=None)
         self.state_dim = state_dim
