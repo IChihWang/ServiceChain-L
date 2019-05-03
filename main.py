@@ -102,7 +102,7 @@ def train():
     #chains = DummyGenChains()
     #print(len(chains))
 
-    epochs = 6000
+    epochs = cfg.Train_Epochs
 
     # list of queue of event of chain arrival and finishes
     #event_list = [{'arrive': [], 'finish': [], 'queue': []} for idx in range(cfg.SIMU_TIME)]
@@ -208,7 +208,7 @@ def train():
             #logger.info(arrive_list)
             print("Average waiting time is ", len(waiting_list), sum(waiting_list) / len(waiting_list))
 
-        if epoch % cfg.Save_Model_Epoch == 0:
+        if (epoch+1) % cfg.Save_Model_Epoch == 0:
             logger.info("Save Model")
             agent.save_model(epoch)
     return chains
@@ -305,7 +305,9 @@ if __name__ == "__main__":
     parser.add_argument('--load', type=str, default=None)
     parser.add_argument('--pi_lr', type=float, default=1e-4)
     parser.add_argument('--v_lr', type=float, default=1e-4)
-    #parser.add_argument('--eval', type=str, default=None)
+    parser.add_argument('--eval', action='store_true', default=False)
+    parser.add_argument('--use_dummy', action='store_true', default=False)
+
     config_rl = parser.parse_args()
 
     local_steps_per_epoch = 1000
@@ -319,8 +321,11 @@ if __name__ == "__main__":
         agent.load_model()
         print("load")
 
-    chains = train()
-    #chains = eval(False)
+    if config_rl.eval:
+        chains = eval(config_rl.use_dummy)
+    else:
+        chains = train()
+    #
 
     # Results
     waiting_list = [chain.waitingTime if chain.finish_time is not None else 1000 for chain in chains]

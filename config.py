@@ -1,6 +1,6 @@
 
 ### Setting of the simulation
-SIMU_TIME = 15
+SIMU_TIME = 45
 SIMU_TIME_TRAIN = 100
 
 ### Setting of the data center
@@ -12,3 +12,6 @@ BW_MAX = 100
 ### RL Hyperparameters
 VAL_FREQENCY = 20
 Save_Model_Epoch = 2000
+
+# number of training epochs
+Train_Epochs = 10000
