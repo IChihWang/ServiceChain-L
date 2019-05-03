@@ -39,11 +39,11 @@ def DummyGenChains():
     # List of chains
     testSet = []
     
-    num_chain = randrange(100)
+    num_chain = randrange(10)
     print("num_chain", num_chain)
     num_function_chain = randrange(1,10)
     num_function_chain = 3
-    print("Waring !! Fix num_function_chain Now !!")
+    #print("Waring !! Fix num_function_chain Now !!")
 
     #∂çprint("num_function_chain", num_function_chain)
     for idx in range(num_chain):

@@ -1,7 +1,7 @@
 import config as cfg
 from DeployAlg import DummyAlgorithm
 import numpy as np
-
+from utils import logger
 
 class State:
     def __init__(self, state_dim):
@@ -16,12 +16,16 @@ class State:
         self.episode_counter = 0
         self.finishtimes = 0
         self.chain_cnt = 0
+        self.last_state = None
+        self.is_last_in_time = False
 
     def get_obs(self):
 
         tmp = np.vstack((self.server_state, self.chain_state))
         tmp = tmp.reshape(1,-1)
+
         assert self.state_dim == tmp.shape[1]
+        self.last_state = tmp
         return tmp   #[self.server_state, self.chain_state]
 
     def construct_chain_state(self, chain_state):
@@ -40,7 +44,7 @@ class State:
         var = np.var(state[:,0:-1]) + 0.0001
         #print(mu,var)
         #exit()
-        state[:,0:-1] = (state[:,0:-1]-mu)/var
+        state[:,0:-1] = (state[:,0:-1]-mu)/50 #/var
         #state[:, 0:-1] = state[:, 0:-1]/100.0
         #print(type(state))
         #print("serverstate:", state)
@@ -55,7 +59,7 @@ class State:
         state[:, 2] = state[:, 2] / self.server_max[2]
         state = np.square(state)
 
-        return np.sum(state)/10.0
+        return np.sum(state)/100.0
 
 
     def update_server_max(self, servers):
@@ -83,6 +87,8 @@ class State:
         self.counter = 0
         self.finishtimes += 1
         self.chain_cnt = 0
+        self.last_state = None
+        self.is_last_in_time = False
 
     def update_chain_cnt(self):
         self.chain_cnt += 1
@@ -153,6 +159,7 @@ class DataCenter:
             #RLstate = self.constructRLstate(self.servers)
             env.construct_server_state(self.servers)
             rl_state = env.get_obs()
+
             #print("get_obs", rl_state)
             #exit()
 
@@ -177,13 +184,14 @@ class DataCenter:
 
             else:
                 # Reject directly if latency requirement doesn't meet
-                print("Fail")
+                print("latency Fail:", function_idx, server_idx)
                 is_deployed = False
 
             # store
             if is_deployed:
                 reward = 0
             else:
+                print("resource Fail:", function_idx, server_idx)
                 reward = -10
             agent.buf.store(rl_state, a, reward, v_t, logp_t)
 
@@ -214,6 +222,7 @@ class DataCenter:
             self.chains.append(chain)
             reward = 10
             reward = env.norm2_reward(self.servers)
+            #logger.info("success reward: {}".format(reward))
             agent.buf.overwrite_last_rew(reward)
             env.ep_ret += reward
 
@@ -229,7 +238,8 @@ class DataCenter:
         magic = 100#np.random.randint(20, 66)
 
         #if env.counter > magic :
-        if env.chain_cnt >5:
+        #if env.chain_cnt >=5:
+        if env.is_last_in_time:
             terminal = True
             last_val = agent.sess.run(agent.v, feed_dict={agent.x_ph: rl_state.reshape(1, -1)})
             agent.buf.finish_path(last_val)
@@ -237,7 +247,7 @@ class DataCenter:
             agent.log_tf(env.ep_ret, 'Return', env.episode_counter)
             print('Return:', env.ep_ret)
 
-            if env.finishtimes % 5 == 0:
+            if env.finishtimes % 50 == 0:
                 print("!!!!!!!!!!!!Update")
                 agent.update()
             #print("Doing update:", env.episode_counter)

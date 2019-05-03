@@ -102,7 +102,7 @@ def train():
     #chains = DummyGenChains()
     #print(len(chains))
 
-    epochs = 3000
+    epochs = 6000
 
     # list of queue of event of chain arrival and finishes
     #event_list = [{'arrive': [], 'finish': [], 'queue': []} for idx in range(cfg.SIMU_TIME)]
@@ -141,6 +141,11 @@ def train():
                 chain_state = get_func_in_chain(chain)
                 env.construct_chain_state(chain_state)
 
+                ##
+                if chain == event_list[t_idx]['queue'][-1] and not event_list[t_idx]['arrive']:
+                    env.is_last_in_time= True
+                    #print("last!")
+
                 # step(a)
                 is_success = data_center.assignChain(chain, env, agent)
 
@@ -160,6 +165,10 @@ def train():
                 chain_state = get_func_in_chain(chain)
                 env.construct_chain_state(chain_state)
 
+                if chain == event_list[t_idx]['arrive'][-1]:
+                    env.is_last_in_time = True
+                    #print("last!!")
+
                 is_success = data_center.assignChain(chain, env, agent)
 
                 if is_success:
@@ -172,6 +181,22 @@ def train():
                     # Record waiting, and queue to next time (at the first of the queue)
                     chain.waitingTime += 1
                     event_list[t_idx + 1]['queue'].insert(0, chain)
+
+        if env.last_state is not None:
+            #print("!!!!!!!!!!!!LAST Traj!!!")
+            ## ad hoc
+            ## last traj
+            last_val = agent.sess.run(agent.v, feed_dict={agent.x_ph: env.last_state.reshape(1, -1)})
+            agent.buf.finish_path(last_val)
+            env.episode_counter += 1
+            agent.log_tf(env.ep_ret, 'Return', env.episode_counter)
+            print('Return:', env.ep_ret)
+
+            if env.finishtimes % 5 == 0:
+                print("!!!!!!!!!!!!Update")
+                agent.update()
+            # print("Doing update:", env.episode_counter)
+            env.reset()
 
         if (epoch % cfg.VAL_FREQENCY) == 0:
             #val_performance()
@@ -279,7 +304,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--load', type=str, default=None)
     parser.add_argument('--pi_lr', type=float, default=1e-4)
-    parser.add_argument('--v_lr', type=float, default=1e-3)
+    parser.add_argument('--v_lr', type=float, default=1e-4)
+    #parser.add_argument('--eval', type=str, default=None)
     config_rl = parser.parse_args()
 
     local_steps_per_epoch = 1000
@@ -292,8 +318,9 @@ if __name__ == "__main__":
     if config_rl.load:
         agent.load_model()
         print("load")
-    #chains = train()
-    chains = eval(False)
+
+    chains = train()
+    #chains = eval(False)
 
     # Results
     waiting_list = [chain.waitingTime if chain.finish_time is not None else 1000 for chain in chains]
