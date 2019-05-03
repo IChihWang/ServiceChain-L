@@ -111,7 +111,8 @@ class Agent():
         self.train_v_iters = train_v_iters
 
         self.train_dir = './train_dir'
-
+        self.step_epochs = tf.Variable(0, trainable=False, name='step')
+        #self.step_op = tf.assign(self.step_epochs, )
 
         #self.x_ph, self.a_ph = core.placeholders_from_spaces(state_dim, action_dim)
         self.adv_ph, self.ret_ph, self.logp_old_ph = core.placeholders(None, None, None)
@@ -156,6 +157,14 @@ class Agent():
         self.sess = tf.Session()
         self.sess.run(tf.global_variables_initializer())
         self.summary_writer = tf.summary.FileWriter(self.train_dir, self.sess.graph)
+
+    def updat_step_epochs(self, step):
+
+        self.sess.run(tf.assign(self.step_epochs, step))
+
+    def get_step_epochs(self):
+
+        return self.sess.run(self.step_epochs)
 
     def update(self):
         #[print("buffer shpae:", tmp.shape) for tmp in self.buf.get()]

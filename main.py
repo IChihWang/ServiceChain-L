@@ -103,11 +103,12 @@ def train():
     #print(len(chains))
 
     epochs = cfg.Train_Epochs
-
+    start_epoch = agent.get_step_epochs()
+    print(start_epoch)
     # list of queue of event of chain arrival and finishes
     #event_list = [{'arrive': [], 'finish': [], 'queue': []} for idx in range(cfg.SIMU_TIME)]
 
-    for epoch in range(epochs):
+    for epoch in range(start_epoch, epochs+start_epoch):
 
         print("epoch:", epoch)
         random.seed(7)
@@ -209,6 +210,8 @@ def train():
             print("Average waiting time is ", len(waiting_list), sum(waiting_list) / len(waiting_list))
 
         if (epoch+1) % cfg.Save_Model_Epoch == 0:
+            agent.updat_step_epochs(epoch+1)
+
             logger.info("Save Model")
             agent.save_model(epoch)
     return chains
@@ -310,7 +313,7 @@ if __name__ == "__main__":
 
     config_rl = parser.parse_args()
 
-    local_steps_per_epoch = 1000
+    local_steps_per_epoch = 2000
     state_dim = int(6 ** 3 // 4 * 4 + 4 * 3)
     print("state_dim:", state_dim)
     env = State(state_dim)

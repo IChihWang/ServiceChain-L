@@ -1,6 +1,6 @@
 
 ### Setting of the simulation
-SIMU_TIME = 45
+SIMU_TIME = 50
 SIMU_TIME_TRAIN = 100
 
 ### Setting of the data center
