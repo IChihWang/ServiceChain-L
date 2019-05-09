@@ -14,4 +14,4 @@ VAL_FREQENCY = 20
 Save_Model_Epoch = 2000
 
 # number of training epochs
-Train_Epochs = 10000
+Train_Epochs = 30000

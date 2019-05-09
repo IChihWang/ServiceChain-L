@@ -36,30 +36,51 @@ class State:
         self.chain_state = chain_state
         self.chain_state_ptr = 0
 
+    def construct_normalize_reward(self, servers):
+        state = [(a.availableCPU, a.availableMEM, a.availableBW) for a in servers]
+        state = np.asarray(state)
+        state = state.astype(float)
+        state = state/100.0
+        state = np.square(state)
+        self.reward_norm_factor = np.sum(state)
+        #print("norm_factor:", self.reward_norm_factor)
+
+
+
+
     def construct_server_state(self, servers):
         state = [(a.availableCPU, a.availableMEM, a.availableBW, a.delayFactor) for a in servers]
         state = np.asarray(state)
         state = state.astype(float)
+        '''
         mu = 100 #np.mean(state[:,0:-1])
         var = np.var(state[:,0:-1]) + 0.0001
         #print(mu,var)
         #exit()
         state[:,0:-1] = (state[:,0:-1]-mu)/50 #/var
         #state[:, 0:-1] = state[:, 0:-1]/100.0
-        #print(type(state))
+        '''
+        # scaling to [0-1]
+        state[:, 0:-1] = state[:,0:-1]/ 100.0 - 0.5
         #print("serverstate:", state)
+
+        ##
         self.server_state = state
 
     def norm2_reward(self, servers):
         state = [(a.availableCPU, a.availableMEM, a.availableBW) for a in servers]
         state = np.asarray(state)
         state = state.astype(float)
+
+        #state = state / 100.0
+
         state[:,0] = state[:,0]/self.server_max[0]
         state[:, 1] = state[:, 1] / self.server_max[1]
         state[:, 2] = state[:, 2] / self.server_max[2]
         state = np.square(state)
 
-        return np.sum(state)/100.0
+        #return np.sum(state)/self.reward_norm_factor
+        return np.sum(state)/100
 
 
     def update_server_max(self, servers):
@@ -75,6 +96,10 @@ class State:
         self.counter += 1
         self.chain_state[self.chain_state_ptr] = 0
         self.chain_state_ptr += 1
+        #done =agent.buf.is_full()
+        #if self.counter == 1999:
+        #    done = True
+        #return agent.buf.is_full()
         #print(self.chain_state)
         #exit()
 
@@ -145,7 +170,7 @@ class DataCenter:
 
         # Try to deploy the chain
         env.update_server_max(self.servers)
-
+        env.construct_normalize_reward(self.servers)
         #env.norm2_reward(self.servers)
         env.update_chain_cnt()
         for function_idx in range(len(chain.serviceFunctions)):
@@ -167,9 +192,11 @@ class DataCenter:
 
             # Agent predict  action
             a, v_t, logp_t = agent.sess.run(agent.get_action_ops, feed_dict={agent.x_ph: rl_state.reshape(1, -1)})
-            #print("a:", a)
+            #print("a:", a, logp_t)
             server_idx = a[0]
+            #terminal = agent.buf.is_full() #env.step()
             env.step()
+            #logger.info("counter:{}".format(env.counter))
 
             # Dummy
             if use_dummy:
@@ -192,9 +219,10 @@ class DataCenter:
                 reward = 0
             else:
                 print("resource Fail:", function_idx, server_idx)
-                reward = -10
+                #print("agent ptr", agent.buf.ptr)
+                reward = -5
             agent.buf.store(rl_state, a, reward, v_t, logp_t)
-
+            terminal = agent.buf.is_full()
 
             if is_deployed:
                 # Record the server idx on function if deployment succeed
@@ -220,7 +248,7 @@ class DataCenter:
             #print("success")
             # If deploy chain sucessfully
             self.chains.append(chain)
-            reward = 10
+
             reward = env.norm2_reward(self.servers)
             #logger.info("success reward: {}".format(reward))
             agent.buf.overwrite_last_rew(reward)
@@ -239,15 +267,22 @@ class DataCenter:
 
         #if env.counter > magic :
         #if env.chain_cnt >=5:
-        if env.is_last_in_time:
-            terminal = True
-            last_val = agent.sess.run(agent.v, feed_dict={agent.x_ph: rl_state.reshape(1, -1)})
+        if env.is_last_in_time or terminal:
+
+            if terminal:
+                logger.info("Buffer full")
+                print("Buffer Full")
+
+            #last_val = agent.sess.run(agent.v, feed_dict={agent.x_ph: rl_state.reshape(1, -1)})
+            last_val = env.ep_ret
+
             agent.buf.finish_path(last_val)
             env.episode_counter += 1
             agent.log_tf(env.ep_ret, 'Return', env.episode_counter)
             print('Return:', env.ep_ret)
-
-            if env.finishtimes % 50 == 0:
+            logger.info("Return:{}, PTR:{}".format(env.ep_ret, agent.buf.ptr))
+            if env.finishtimes % 50 == 0 or agent.buf.is_full():
+                logger.info("update")
                 print("!!!!!!!!!!!!Update")
                 agent.update()
             #print("Doing update:", env.episode_counter)
@@ -280,7 +315,7 @@ class DataCenter:
 
             # Agent predict  action
             a, v_t, logp_t = agent.sess.run(agent.get_action_ops, feed_dict={agent.x_ph: rl_state.reshape(1, -1)})
-            #print("a:", a)
+            print("a:", a, logp_t)
             server_idx = a[0]
             env.step()
 
@@ -303,7 +338,7 @@ class DataCenter:
                 reward = 0
             else:
                 print("Fail")
-                reward = -10
+                reward = -2
 
             if is_deployed:
                 # Record the server idx on function if deployment succeed
@@ -340,7 +375,7 @@ class DataCenter:
             env.ep_ret += reward
             #return False
 
-        if env.chain_cnt >5:
+        if env.is_last_in_time:
 
             env.episode_counter += 1
 

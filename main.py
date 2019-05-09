@@ -111,6 +111,7 @@ def train():
     for epoch in range(start_epoch, epochs+start_epoch):
 
         print("epoch:", epoch)
+        logger.info("epoch:{}".format(epoch))
         random.seed(7)
         data_center = DataCenter(6)
         chains = DummyGenChains()
@@ -156,6 +157,8 @@ def train():
 
                     event_list[chain.finish_time]['finish'].append(chain)
                 else:
+                    if t_idx ==(cfg.SIMU_TIME_TRAIN - 2):
+                        continue
                     # Record waiting, and queue to next time (at the first of the queue)
                     chain.waitingTime += 1
                     event_list[t_idx + 1]['queue'].insert(0, chain)
@@ -180,6 +183,8 @@ def train():
                     event_list[chain.finish_time]['finish'].append(chain)
                 else:
                     # Record waiting, and queue to next time (at the first of the queue)
+                    if t_idx ==(cfg.SIMU_TIME_TRAIN - 2):
+                        continue
                     chain.waitingTime += 1
                     event_list[t_idx + 1]['queue'].insert(0, chain)
 
@@ -234,6 +239,7 @@ def eval(use_dummy=True):
     for epoch in range(epochs):
 
         print("epoch:", epoch)
+
         random.seed(7)
         data_center = DataCenter(6)
         chains = DummyGenChains()
@@ -266,6 +272,10 @@ def eval(use_dummy=True):
                 chain_state = get_func_in_chain(chain)
                 env.construct_chain_state(chain_state)
 
+                if chain == event_list[t_idx]['queue'][-1] and not event_list[t_idx]['arrive']:
+                    env.is_last_in_time= True
+                    #print("last!")
+
                 # step(a)
                 is_success = data_center.assignChain_eval(chain, env, agent, use_dummy)
 
@@ -284,6 +294,10 @@ def eval(use_dummy=True):
             for chain in (event_list[t_idx]['arrive']):
                 chain_state = get_func_in_chain(chain)
                 env.construct_chain_state(chain_state)
+
+                if chain == event_list[t_idx]['arrive'][-1]:
+                    env.is_last_in_time = True
+                    #print("last!!")
 
                 is_success = data_center.assignChain_eval(chain, env, agent, use_dummy)
 
@@ -313,7 +327,7 @@ if __name__ == "__main__":
 
     config_rl = parser.parse_args()
 
-    local_steps_per_epoch = 2000
+    local_steps_per_epoch = 1000
     state_dim = int(6 ** 3 // 4 * 4 + 4 * 3)
     print("state_dim:", state_dim)
     env = State(state_dim)

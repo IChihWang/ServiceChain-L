@@ -1,7 +1,7 @@
 
 import tensorflow as tf
 import core as core
-#import gym
+import gym
 import numpy as np
 import os
 
@@ -40,6 +40,9 @@ class VPGBuffer:
         self.val_buf[self.ptr] = val
         self.logp_buf[self.ptr] = logp
         self.ptr += 1
+
+    def is_full(self):
+        return self.ptr > self.max_size -10
 
     def overwrite_last_rew(self, rew):
         self.rew_buf[self.ptr-1] = rew
@@ -118,7 +121,7 @@ class Agent():
         self.adv_ph, self.ret_ph, self.logp_old_ph = core.placeholders(None, None, None)
 
         actor_critic = core.mlp_actor_critic
-        self.pi, self.logp, self.logp_pi, self.v = actor_critic(self.x_ph, self.a_ph, action_space=action_dim)
+        self.pi, self.logp, self.logp_pi, self.v, self.entropy = actor_critic(self.x_ph, self.a_ph, action_space=action_dim)
         print("logp", self.logp.shape)
         # Need all placeholders in *this* order later (to zip with data from buffer)
         self.all_phs = [self.x_ph, self.a_ph, self.adv_ph, self.ret_ph, self.logp_old_ph]
@@ -136,6 +139,10 @@ class Agent():
 
         # VPG objectives
         self.pi_loss = -tf.reduce_mean(self.logp * self.adv_ph)
+        #print((self.logp * self.adv_ph).shape)
+        #print((self.pi*self.logp).shape)
+        #exit()
+        self.pi_loss = -tf.reduce_mean(self.logp * self.adv_ph )  -  0.01*tf.reduce_mean(self.entropy)
         #self.pi_loss = self.logp
         self.v_loss = tf.reduce_mean((self.ret_ph - self.v) ** 2)
 
@@ -148,6 +155,7 @@ class Agent():
         self.train_pi = self.actor_optimizer.minimize(self.pi_loss, global_step = self.global_step)
         self.train_v = self.critic_optimizer.minimize(self.v_loss, global_step = self.global_step)
 
+        tf.summary.histogram('log_pi', -self.logp)
         tf.summary.scalar('pi_loss', self.pi_loss)
         tf.summary.scalar('v_loss', self.v_loss)
         tf.summary.scalar('approx_ent', self.approx_ent)
@@ -214,7 +222,7 @@ class Agent():
         self.summary_writer.add_summary(summary, step_counter)
 
 def train():
-    epochs = 50
+    epochs = 150
     episode_counter = 0
     o, r, d, ep_ret, ep_len = env.reset(), 0, False, 0, 0
     for epoch in range(epochs):
@@ -222,7 +230,7 @@ def train():
         for t in range(local_steps_per_epoch):
             #print(t, ep_len)
             a, v_t, logp_t = agent.sess.run(agent.get_action_ops, feed_dict={agent.x_ph: o.reshape(1, -1)})
-            #print(a.shape, v_t, logp_t)
+            #print(a.shape, v_t, logp_t.shape)
             #exit()
             # save and log
             agent.buf.store(o, a, r, v_t, logp_t)
@@ -308,5 +316,5 @@ if __name__ == "__main__":
 
     agent = Agent(state_dim, action_dim, config_rl, steps_per_epoch=local_steps_per_epoch)
 
-    #train()
-    eval()
+    train()
+    #eval()
