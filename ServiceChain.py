@@ -1,5 +1,5 @@
 import config as cfg
-from random import randrange
+from random import randrange, expovariate, uniform
 
 
 class ServiceFunction:
@@ -84,16 +84,62 @@ def DummyGenChains():
     # List of chains
     testSet = []
     
-    num_chain = randrange(100)
-    num_function_chain = randrange(1,10)
+    num_chain = randrange(300)
+    #num_function_chain = randrange(1,10)
+    num_function_chain = 5
     
     for idx in range(num_chain):
         functs = []
         for jdx in range(num_function_chain):
-            functs.append(ServiceFunction(1, 2, 3))
-        chain = ServiceChain(100, 5, randrange(cfg.SIMU_TIME-10), functs)
+            functs.append(ServiceFunction(40, 35, 35))
+        chain = ServiceChain(20, 5, randrange(cfg.SIMU_TIME-10), functs)
         
         testSet.append(chain)
+        
+    return testSet
+    
+def PoissonGenChains(k, arrival_rate, service_rate):
+    # List of chains
+    testSet = []
+
+    time_idx = 0
+    while time_idx < cfg.SIMU_TIME:
+        
+        num_function_chain = randrange(1,10)
+    
+        functs = []
+        for jdx in range(num_function_chain):
+            CPU_req = int(uniform(1,50))
+            MEM_req = int(uniform(1,50))
+            BW_req = int(uniform(1,50))
+            functs.append(ServiceFunction(CPU_req, MEM_req, BW_req))
+            
+        service_time = expovariate(service_rate)*(1/cfg.TIME_STEP_PER_SECOND) + 1
+        
+        min_delay = 0
+        server_num = 1
+        agg_function = ServiceFunction(0,0,0)
+        for idx in range(num_function_chain):
+            agg_function.O2AI_aggregate_function(functs[idx])
+            if agg_function.cpu > 100 or agg_function.mem > 100 or agg_function.bw > 100:
+                agg_function = ServiceFunction(0,0,0)
+                server_num += 1
+        min_delay += 6 * server_num // ((k/2)*(k/2))
+        min_delay += 4 * ((server_num)%((k/2)*(k/2))) // (k/2)
+        min_delay += 2 * ((server_num)%(k/2))
+        
+        
+        max_delay = 6 * (num_function_chain-1)
+        
+        delay = uniform(min_delay, max_delay)
+        
+        chain = ServiceChain(delay, int(service_time), int(time_idx), functs)
+        
+        testSet.append(chain)
+        
+        next_time = expovariate(arrival_rate)*(1/cfg.TIME_STEP_PER_SECOND)
+        time_idx += next_time
+        
         
     return testSet
     

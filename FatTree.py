@@ -3,6 +3,7 @@ import itertools
 import copy
 from DeployAlg import DummyAlgorithm
 from ServiceChain import ServiceFunction, ServiceChain
+import math
 
 
 class Server:
@@ -33,6 +34,11 @@ class Server:
         self.availableCPU += function.cpu
         self.availableMEM += function.mem
         self.availableBW += function.bw
+        
+        # DEBUG
+        assert self.availableCPU <= cfg.CPU_MAX
+        assert self.availableMEM <= cfg.MEM_MAX
+        assert self.availableBW <= cfg.BW_MAX
         
     def canFitFunction(self, function):
         is_success = True
@@ -92,15 +98,15 @@ class Server:
     
     
     def O2AI_deploy(self, chain, datacenter, whole_chain):
-    
+        
         # Handle leaves
         if len(self.O2AI_child_servers) == 0:
             deployed_num = 0
             func_list = chain.serviceFunctions
             for function in func_list:
                 is_sucess = self.addFunction(function)
-                function.server_idx = self.index
                 if is_sucess:
+                    function.server_idx = self.index
                     deployed_num += 1
                 else:
                     break
@@ -109,7 +115,6 @@ class Server:
             new_chain = chain.O2AI_copy(new_func_list)
             
             return {"remaining_chain":new_chain, "deployed_num":deployed_num}
-        
         
         # Handle nodes
         deployed_num = 0
@@ -259,8 +264,7 @@ class Server:
             
             is_re_predict = False
             if min_score != float('inf'):
-                bf_type = "CPU"
-                if bf_type == 0:
+                if bf_type == "CPU":
                     # Deploy with cpu
                     while True:
                         func_list = sub_chain.serviceFunctions
@@ -270,11 +274,11 @@ class Server:
                             if server.canFitFunction(target_func):
                                 score = server.availableCPU-target_func.cpu
                                 server_list.append({"server":server, "score":score})
-                        server_list.sort(key=lambda x: x.score)
+                        server_list.sort(key=lambda x: x["score"])
                         
                         is_deployed = False
                         for server in server_list:
-                            result = server.O2AI_deploy(sub_chain, datacenter, whole_chain)
+                            result = server["server"].O2AI_deploy(sub_chain, datacenter, whole_chain)
                             if result["deployed_num"] > 0:
                                 deployed_num += result["deployed_num"]
                                 sub_chain = result["remaining_chain"]
@@ -304,11 +308,11 @@ class Server:
                             if server.canFitFunction(target_func):
                                 score = server.availableMEM-target_func.mem
                                 server_list.append({"server":server, "score":score})
-                        server_list.sort(key=lambda x: x.score)
+                        server_list.sort(key=lambda x: x["score"])
                         
                         is_deployed = False
                         for server in server_list:
-                            result = server.O2AI_deploy(sub_chain, datacenter, whole_chain)
+                            result = server["server"].O2AI_deploy(sub_chain, datacenter, whole_chain)
                             if result["deployed_num"] > 0:
                                 deployed_num += result["deployed_num"]
                                 sub_chain = result["remaining_chain"]
@@ -337,11 +341,11 @@ class Server:
                             if server.canFitFunction(target_func):
                                 score = server.availableBW-target_func.bw
                                 server_list.append({"server":server, "score":score})
-                        server_list.sort(key=lambda x: x.score)
+                        server_list.sort(key=lambda x: x["score"])
                         
                         is_deployed = False
                         for server in server_list:
-                            result = server.O2AI_deploy(sub_chain, datacenter, whole_chain)
+                            result = server["server"].O2AI_deploy(sub_chain, datacenter, whole_chain)
                             if result["deployed_num"] > 0:
                                 deployed_num += result["deployed_num"]
                                 sub_chain = result["remaining_chain"]
@@ -370,9 +374,12 @@ class Server:
         if current_latency > whole_chain.latency_req:
             # Fail due to latency violation
             for function in chain.serviceFunctions:
-                server = datacenter.servers[function.server_idx]
-                server.removeFunction(function)
-                function.server_idx = None
+                if function.server_idx == None:
+                    break
+                else:
+                    server = datacenter.servers[function.server_idx]
+                    server.removeFunction(function)
+                    function.server_idx = None
             sub_chain = chain
             deployed_num = 0
                 
@@ -412,6 +419,8 @@ class Server:
                     server = datacenter.servers[function.server_idx]
                     server.removeFunction(function)
                     function.server_idx = None
+                else:
+                    break
                     
             sub_chain = chain
             deployed_num = 0
@@ -542,8 +551,6 @@ class DataCenter:
             # Try to deploy the function
             if (chain.current_latency_req >= target_server.delayFactor):
                 is_deployed = target_server.addFunction(target_function)
-                if is_deployed:
-                    target_function.server_idx = target_server.index
                 
             else:
                 # Reject directly if latency requirement doesn't meet
@@ -611,8 +618,6 @@ class DataCenter:
                     is_feasible = False
                     last_success_fun_idx = fun_idx
                     break
-                else:
-                    target_function.server_idx = target_server.index
             
             # Resource violation or not
             if (is_feasible):
@@ -656,7 +661,6 @@ class DataCenter:
         agg_servers = [ Server(idx+idx_jump_agg) for idx in range(self.k)]
         edge_servers = [ Server(idx+idx_jump_edge) for idx in range((self.k**2)/2)]
         
-        
         # Construct edge level
         for idx in range(len(self.servers)):
             server = self.servers[idx]
@@ -694,11 +698,22 @@ class DataCenter:
         result = root_resource_tree.O2AI_deploy(chain, self, chain)
         
         if len(result['remaining_chain'].serviceFunctions) > 0:
-            server_idx_list = [function.server_idx for function in chain.serviceFunctions if function.server_idx != None]
+            for function in chain.serviceFunctions:
+                if function.server_idx != None:
+                    server = self.servers[function.server_idx]
+                    server.removeFunction(function)
+                    function.server_idx = None
+                else:
+                    break
+                    
+            return False
+        
+        else:
+            server_idx_list = [function.server_idx for function in chain.serviceFunctions]
             current_latency = self.computeLatency(server_idx_list)
             if current_latency > chain.latency_req:
                 for function in chain.serviceFunctions:
-                    server = datacenter.servers[function.server_idx]
+                    server = self.servers[function.server_idx]
                     server.removeFunction(function)
                     function.server_idx = None
                 sub_chain = chain
@@ -706,7 +721,7 @@ class DataCenter:
                 
                 return False
         
-        else:
+            
             # Deploy sucessfully
         
             # ============ For Debug =======================
@@ -718,6 +733,7 @@ class DataCenter:
                     print("Error: empty server index")
             
             server_idx_list = [function.server_idx for function in chain.serviceFunctions]
+            
             current_latency = self.computeLatency(server_idx_list)
             if current_latency > chain.latency_req:
                 # This should be handled during deployment
@@ -846,6 +862,82 @@ class DataCenter:
             # TODO: constuct remain chain
             return {"jump_server_num": jump_server_num, "sub_chain_list": sub_chain_list, "sorted_server_idxs": sorted_server_idxs, "remain_chain": }
     '''
+    
+    
+    # Heuristic Assignment with SOVWin
+    def assignChainSOVWin(self, chain):
+        window = 1
+        
+        func_list = chain.serviceFunctions
+        acc_func_list = [func_list[0].O2AI_copy()]
+        # Accumulate the functions
+        for funct_idx in range(1, len(func_list)):
+            acc_function = func_list[funct_idx].O2AI_copy()
+            acc_function.O2AI_aggregate_function(acc_func_list[funct_idx-1])
+            acc_func_list.append(acc_function)
+        
+        is_success = False
+        while True:
+            # Try several windows
+            
+            min_server_idx_list = None
+            min_latency = float("inf")
+            for server_idx in range(len(self.servers)-window+1):
+                server_list = self.servers[server_idx:server_idx+window]
+                server_list.sort(key=lambda x: x.availableCPU+x.availableMEM+x.availableBW, reverse=True)
+            
+                function_ptr = 0
+                server_idx_list = []
+                for server in server_list:
+                    is_feasible = True
+                    for function_idx in range(function_ptr, len(acc_func_list)):
+                        if not server.canFitFunction(acc_func_list[function_idx]):
+                            function_ptr = function_idx
+                            is_feasible = False
+                            break
+                        else:
+                            server_idx_list.append(server.index)
+                            
+                    if is_feasible:
+                        for function_idx in range(function_ptr, len(acc_func_list)):
+                            target_agg_function = acc_func_list[function_ptr-1]
+                            acc_func_list[function_idx].O2AI_rm_aggregate_function(target_agg_function)
+                
+                if len(server_idx_list) == len(func_list):
+                    current_latency=self.computeLatency(server_idx_list)
+                    if current_latency < min_latency:
+                        min_latency = current_latency
+                        min_server_idx_list = server_idx_list
+            
+            if min_server_idx_list != None:
+                # Found solution
+                for idx in range(len(min_server_idx_list)):
+                    function = func_list[idx]
+                    server = self.servers[min_server_idx_list[idx]]
+                    server.addFunction(function)
+                    function.server_idx = min_server_idx_list[idx]
+                is_success = True
+                break
+            
+            window += 1
+            if window > len(self.servers):
+                # Fail deployment
+                is_success = False
+                break
+            
+            if window > math.ceil(chain.latency_req/6) * ((self.k)**2)/4:
+                break
+        
+        
+        return is_success
+        
+        
+    def getUtilization(self):
+        #print([cfg.CPU_MAX-server.availableCPU for server in self.servers if cfg.CPU_MAX-server.availableCPU < 0])
+        cpu_uti = sum([cfg.CPU_MAX-server.availableCPU for server in self.servers]) / float(len(self.servers)*cfg.CPU_MAX)
+        mem_uti = sum([cfg.CPU_MAX-server.availableMEM for server in self.servers]) / float(len(self.servers)*cfg.MEM_MAX)
+        bw_uti = sum([cfg.CPU_MAX-server.availableBW for server in self.servers]) / float(len(self.servers)*cfg.BW_MAX)
+        return [cpu_uti, mem_uti, bw_uti]
             
     
     def initDelayFactor(self):
