@@ -1,8 +1,9 @@
 from FatTree import DataCenter, State
-from ServiceChain import DummyGenChains
+from ServiceChain import DummyGenChains, PoissonGenChains
 from agent import Agent
 import config as cfg
 import time
+import sys
 import numpy as np
 import random
 from utils import logger
@@ -32,69 +33,7 @@ def get_func_in_chain(chain):
     #print("chain_State:", chain_state)
     return chain_state
 
-'''
-def train_():
 
-    event_list = [{'arrive': [], 'finish': [], 'queue': []} for idx in range(cfg.SIMU_TIME)]
-
-    for chain in chains:
-        t_idx = chain.arrive_time
-        event_list[t_idx]['arrive'].append(chain)
-
-    # Start simulation
-    for t_idx in range(cfg.SIMU_TIME - 1):
-
-        print("t_idx:", t_idx)
-        env.update_wall_time()
-
-        # 1. handle finished chain
-        for chain in (event_list[t_idx]['finish']):
-            data_center.removeChain(chain)
-
-        # 2. handle queued chain
-        # start = time.time()
-
-        # get_all_func(event_list[t_idx]['queue'])
-        # get_all_func(event_list[t_idx]['arrive'])
-
-        # end = time.time()
-        # print("time:", end-start)
-        for chain in (event_list[t_idx]['queue']):
-            chain_state = get_func_in_chain(chain)
-            env.construct_chain_state(chain_state)
-
-            # step(a)
-            is_success = data_center.assignChain(chain, env, agent)
-
-            if is_success:
-                # Insert finish event
-                chain.finish_time = chain.serviceTime + t_idx
-
-                event_list[chain.finish_time]['finish'].append(chain)
-            else:
-                # Record waiting, and queue to next time (at the first of the queue)
-                chain.waitingTime += 1
-                event_list[t_idx + 1]['queue'].insert(0, chain)
-
-        # 3. handle arrival chain
-
-        for chain in (event_list[t_idx]['arrive']):
-            chain_state = get_func_in_chain(chain)
-            env.construct_chain_state(chain_state)
-
-            is_success = data_center.assignChain(chain, env, agent)
-
-            if is_success:
-                # Insert finish event
-                chain.finish_time = chain.serviceTime + t_idx
-                # print("sT", chain.serviceTime)
-                # input("sdfsd")
-                event_list[chain.finish_time]['finish'].append(chain)
-            else:
-                # Record waiting, and queue to next time (at the first of the queue)
-                chain.waitingTime += 1
-                event_list[t_idx + 1]['queue'].insert(0, chain)
-'''
 
 def train():
     #random.seed(7)
@@ -108,22 +47,34 @@ def train():
     # list of queue of event of chain arrival and finishes
     #event_list = [{'arrive': [], 'finish': [], 'queue': []} for idx in range(cfg.SIMU_TIME)]
 
+    random.seed(7)
     for epoch in range(start_epoch, epochs+start_epoch):
 
         print("epoch:", epoch)
         logger.info("epoch:{}".format(epoch))
-        random.seed(7)
+
+
+        arrival_rate = 1000
+        service_rate = 10
+
+        k = 6
         data_center = DataCenter(6)
-        chains = DummyGenChains()
+        #chains = DummyGenChains()
+        chains = PoissonGenChains(k, arrival_rate, service_rate)
         #print(len(chains))
         event_list = [{'arrive': [], 'finish': [], 'queue': []} for idx in range(cfg.SIMU_TIME_TRAIN)]
+        #event_list = [{'arrive': [], 'finish': [], 'queue': []} for idx in range(cfg.SIMU_TIME)]
 
         for chain in chains:
             t_idx = chain.arrive_time
             event_list[t_idx]['arrive'].append(chain)
 
+        # Statistics
+        resource_utilization = [[], [], []]
+
         # Start simulation
-        for t_idx in range(cfg.SIMU_TIME_TRAIN - 1):
+        #for t_idx in range(cfg.SIMU_TIME_TRAIN - 1):
+        for t_idx in range(len(event_list)):
 
             #print("t_idx:", t_idx)
             env.update_wall_time()
@@ -154,14 +105,22 @@ def train():
                 if is_success:
                     # Insert finish event
                     chain.finish_time = chain.serviceTime + t_idx
+                    #event_list[chain.finish_time]['finish'].append(chain)
+                    if (chain.finish_time < len(event_list)):
+                        event_list[chain.finish_time]['finish'].append(chain)
 
-                    event_list[chain.finish_time]['finish'].append(chain)
                 else:
-                    if t_idx ==(cfg.SIMU_TIME_TRAIN - 2):
-                        continue
                     # Record waiting, and queue to next time (at the first of the queue)
                     chain.waitingTime += 1
-                    event_list[t_idx + 1]['queue'].insert(0, chain)
+                    if (t_idx + 1 < len(event_list)):
+                        event_list[t_idx + 1]['queue'].insert(0, chain)
+
+
+                    #if t_idx ==(cfg.SIMU_TIME_TRAIN - 2):
+                    #    continue
+                    ## Record waiting, and queue to next time (at the first of the queue)
+                    #chain.waitingTime += 1
+                    #event_list[t_idx + 1]['queue'].insert(0, chain)
 
             # 3. handle arrival chain
 
@@ -178,15 +137,26 @@ def train():
                 if is_success:
                     # Insert finish event
                     chain.finish_time = chain.serviceTime + t_idx
-                    # print("sT", chain.serviceTime)
-                    # input("sdfsd")
-                    event_list[chain.finish_time]['finish'].append(chain)
+                    # event_list[chain.finish_time]['finish'].append(chain)
+                    if (chain.finish_time < len(event_list)):
+                        event_list[chain.finish_time]['finish'].append(chain)
+
                 else:
                     # Record waiting, and queue to next time (at the first of the queue)
-                    if t_idx ==(cfg.SIMU_TIME_TRAIN - 2):
-                        continue
                     chain.waitingTime += 1
-                    event_list[t_idx + 1]['queue'].insert(0, chain)
+                    if (t_idx + 1 < len(event_list)):
+                        event_list[t_idx + 1]['queue'].insert(0, chain)
+
+                    # if t_idx ==(cfg.SIMU_TIME_TRAIN - 2):
+                    #    continue
+                    ## Record waiting, and queue to next time (at the first of the queue)
+                    # chain.waitingTime += 1
+                    # event_list[t_idx + 1]['queue'].insert(0, chain)
+
+            utilization = data_center.getUtilization()
+            # print(utilization)
+            for idx in range(3):
+                resource_utilization[idx].append(utilization[idx])
 
         if env.last_state is not None:
             #print("!!!!!!!!!!!!LAST Traj!!!")
@@ -206,13 +176,21 @@ def train():
 
         if (epoch % cfg.VAL_FREQENCY) == 0:
             #val_performance()
-            waiting_list = [chain.waitingTime if chain.finish_time is not None else 1000 for chain in chains]
+            waiting_list = [chain.waitingTime if chain.finish_time is not None else cfg.SIMU_TIME_TRAIN for chain in chains]
+            #waiting_list = [chain.waitingTime for chain in chains if chain.finish_time != None]
+
             agent.log_tf(sum(waiting_list) / len(waiting_list), tag='Avg Waiting Time', step_counter= epoch)
-            logger.info("Epoch{}, Avg waiting time{}".format(epoch, sum(waiting_list) / len(waiting_list)))
+            logger.info("Epoch{}, Avg waiting time job:{}, {}".format(epoch, len(waiting_list), sum(waiting_list) / len(waiting_list)))
             logger.info(waiting_list)
             #arrive_list = [chain.arrive_time for chain in chains]
             #logger.info(arrive_list)
             print("Average waiting time is ", len(waiting_list), sum(waiting_list) / len(waiting_list))
+
+            for idx in range(3):
+                resource_utilization[idx] = sum(resource_utilization[idx]) / len(resource_utilization[idx])
+            print("DataCenter utilization (CPU, MEM, BW): ", resource_utilization)
+            logger.info("DataCenter utilization (CPU, MEM, BW): {} ".format(resource_utilization))
+
 
         if (epoch+1) % cfg.Save_Model_Epoch == 0:
             agent.updat_step_epochs(epoch+1)
@@ -250,6 +228,10 @@ def eval(use_dummy=True):
         for chain in chains:
             t_idx = chain.arrive_time
             event_list[t_idx]['arrive'].append(chain)
+
+        # Statistics
+        resource_utilization = [[], [], []]
+
         #print(event_list)
         # Start simulation
         for t_idx in range(cfg.SIMU_TIME - 1):
@@ -328,7 +310,7 @@ if __name__ == "__main__":
     config_rl = parser.parse_args()
 
     local_steps_per_epoch = 1000
-    state_dim = int(6 ** 3 // 4 * 4 + 4 * 3)
+    state_dim = int(6 ** 3 // 4 * 4 + 4 * 5)
     print("state_dim:", state_dim)
     env = State(state_dim)
     # exit()
@@ -345,7 +327,7 @@ if __name__ == "__main__":
     #
 
     # Results
-    waiting_list = [chain.waitingTime if chain.finish_time is not None else 1000 for chain in chains]
+    waiting_list = [chain.waitingTime if chain.finish_time is not None else cfg.SIMU_TIME for chain in chains]
     print(waiting_list)
     print("Average waiting time is ", len(waiting_list), sum(waiting_list) / len(waiting_list))
 

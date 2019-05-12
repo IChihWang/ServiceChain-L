@@ -1,7 +1,8 @@
 
 ### Setting of the simulation
-SIMU_TIME = 50
-SIMU_TIME_TRAIN = 100
+TIME_STEP_PER_SECOND = 0.0001   # in 0.1ms
+SIMU_TIME = 100
+SIMU_TIME_TRAIN = 125
 
 ### Setting of the data center
 CPU_MAX = 100
