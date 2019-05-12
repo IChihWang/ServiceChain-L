@@ -72,15 +72,15 @@ class State:
         state = np.asarray(state)
         state = state.astype(float)
 
-        #state = state / 100.0
-
+        state = state / 100.0
+        '''
         state[:,0] = state[:,0]/self.server_max[0]
         state[:, 1] = state[:, 1] / self.server_max[1]
         state[:, 2] = state[:, 2] / self.server_max[2]
         state = np.square(state)
-
-        #return np.sum(state)/self.reward_norm_factor
-        return np.sum(state)/100
+        '''
+        return np.sum(state)/self.reward_norm_factor
+        #return np.sum(state)/100
 
 
     def update_server_max(self, servers):
@@ -220,7 +220,7 @@ class DataCenter:
             else:
                 print("resource Fail:", function_idx, server_idx)
                 #print("agent ptr", agent.buf.ptr)
-                reward = -5
+                reward = -1
             agent.buf.store(rl_state, a, reward, v_t, logp_t)
             terminal = agent.buf.is_full()
 
@@ -264,10 +264,10 @@ class DataCenter:
 
         # assume infinte horizon now
         magic = 100#np.random.randint(20, 66)
-
+        bandit = True
         #if env.counter > magic :
         #if env.chain_cnt >=5:
-        if env.is_last_in_time or terminal:
+        if env.is_last_in_time or terminal or bandit:
 
             if terminal:
                 logger.info("Buffer full")
@@ -281,7 +281,7 @@ class DataCenter:
             agent.log_tf(env.ep_ret, 'Return', env.episode_counter)
             print('Return:', env.ep_ret)
             logger.info("Return:{}, PTR:{}".format(env.ep_ret, agent.buf.ptr))
-            if env.finishtimes % 50 == 0 or agent.buf.is_full():
+            if env.finishtimes % 800 == 0 or agent.buf.is_full():
                 logger.info("update")
                 print("!!!!!!!!!!!!Update")
                 agent.update()
@@ -338,7 +338,7 @@ class DataCenter:
                 reward = 0
             else:
                 print("Fail")
-                reward = -2
+                reward = 0
 
             if is_deployed:
                 # Record the server idx on function if deployment succeed

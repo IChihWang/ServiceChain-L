@@ -1,7 +1,7 @@
 
 import tensorflow as tf
 import core as core
-import gym
+#import gym
 import numpy as np
 import os
 
@@ -142,7 +142,7 @@ class Agent():
         #print((self.logp * self.adv_ph).shape)
         #print((self.pi*self.logp).shape)
         #exit()
-        self.pi_loss = -tf.reduce_mean(self.logp * self.adv_ph )  -  0.01*tf.reduce_mean(self.entropy)
+        self.pi_loss = -tf.reduce_mean(self.logp * self.adv_ph ) # -  0.01*tf.reduce_mean(self.entropy)
         #self.pi_loss = self.logp
         self.v_loss = tf.reduce_mean((self.ret_ph - self.v) ** 2)
 
