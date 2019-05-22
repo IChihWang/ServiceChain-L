@@ -92,7 +92,7 @@ def train():
             # print("time:", end-start)
             for chain in (event_list[t_idx]['queue']):
                 chain_state = get_func_in_chain(chain)
-                env.construct_chain_state(chain_state)
+                env.construct_chain_state(chain_state, chain.waitingTime)
 
                 ##
                 if chain == event_list[t_idx]['queue'][-1] and not event_list[t_idx]['arrive']:
@@ -126,7 +126,7 @@ def train():
 
             for chain in (event_list[t_idx]['arrive']):
                 chain_state = get_func_in_chain(chain)
-                env.construct_chain_state(chain_state)
+                env.construct_chain_state(chain_state, chain.waitingTime)
 
                 if chain == event_list[t_idx]['arrive'][-1]:
                     env.is_last_in_time = True
@@ -207,21 +207,30 @@ def eval(use_dummy=True):
     #data_center = DataCenter(6)
     #chains = DummyGenChains()
     #print(len(chains))
+    if use_dummy:
+        print("USe DUmmy")
+    epochs = 10
 
-    epochs = 1
-
-
+    random.seed(7)
     # list of queue of event of chain arrival and finishes
     #event_list = [{'arrive': [], 'finish': [], 'queue': []} for idx in range(cfg.SIMU_TIME)]
+
+    avg_wait_time_buf = []
 
     for epoch in range(epochs):
 
         print("epoch:", epoch)
 
-        random.seed(7)
+        resource_utilization = [[], [], []]
+
+        arrival_rate = 1000
+        service_rate = 10
+
+        k = 6
         data_center = DataCenter(6)
-        chains = DummyGenChains()
-        print(len(chains))
+        # chains = DummyGenChains()
+        chains = PoissonGenChains(k, arrival_rate, service_rate)
+        # print(len(chains))
         event_list = [{'arrive': [], 'finish': [], 'queue': []} for idx in range(cfg.SIMU_TIME)]
 
 
@@ -236,7 +245,7 @@ def eval(use_dummy=True):
         # Start simulation
         for t_idx in range(cfg.SIMU_TIME - 1):
 
-            print("t_idx:", t_idx)
+            #print("t_idx:", t_idx)
             env.update_wall_time()
 
             # 1. handle finished chain
@@ -264,12 +273,15 @@ def eval(use_dummy=True):
                 if is_success:
                     # Insert finish event
                     chain.finish_time = chain.serviceTime + t_idx
+                    # event_list[chain.finish_time]['finish'].append(chain)
+                    if (chain.finish_time < len(event_list)):
+                        event_list[chain.finish_time]['finish'].append(chain)
 
-                    event_list[chain.finish_time]['finish'].append(chain)
                 else:
                     # Record waiting, and queue to next time (at the first of the queue)
                     chain.waitingTime += 1
-                    event_list[t_idx + 1]['queue'].insert(0, chain)
+                    if (t_idx + 1 < len(event_list)):
+                        event_list[t_idx + 1]['queue'].insert(0, chain)
 
             # 3. handle arrival chain
 
@@ -283,16 +295,42 @@ def eval(use_dummy=True):
 
                 is_success = data_center.assignChain_eval(chain, env, agent, use_dummy)
 
+
+
+
                 if is_success:
                     # Insert finish event
                     chain.finish_time = chain.serviceTime + t_idx
-                    # print("sT", chain.serviceTime)
-                    # input("sdfsd")
-                    event_list[chain.finish_time]['finish'].append(chain)
+                    #print("chain.finish_time:", chain.finish_time)
+                    # event_list[chain.finish_time]['finish'].append(chain)
+                    if (chain.finish_time < len(event_list)):
+                        print("skdlfjkjflkjl")
+                        event_list[chain.finish_time]['finish'].append(chain)
+
                 else:
                     # Record waiting, and queue to next time (at the first of the queue)
                     chain.waitingTime += 1
-                    event_list[t_idx + 1]['queue'].insert(0, chain)
+                    if (t_idx + 1 < len(event_list)):
+                        event_list[t_idx + 1]['queue'].insert(0, chain)
+
+        waiting_list = [chain.waitingTime for chain in chains if chain.finish_time != None]
+        print(waiting_list)
+        print("Average waiting time is ", len(waiting_list), sum(waiting_list) / len(waiting_list))
+        avg_wait_time_buf.append(sum(waiting_list) / len(waiting_list))
+        arrive_list = [chain.arrive_time for chain in chains]
+        print("arrive_list", arrive_list)
+
+        utilization = data_center.getUtilization()
+        # print(utilization)
+        for idx in range(3):
+            resource_utilization[idx].append(utilization[idx])
+
+        for idx in range(3):
+            resource_utilization[idx] = sum(resource_utilization[idx]) / len(resource_utilization[idx])
+        print("DataCenter utilization (CPU, MEM, BW): ", resource_utilization)
+        logger.info("DataCenter utilization (CPU, MEM, BW): {} ".format(resource_utilization))
+
+    print("Avg Wait for {} simulation: {}".format(len(avg_wait_time_buf), sum(avg_wait_time_buf) / len(avg_wait_time_buf)))
 
     return chains
 
@@ -310,14 +348,14 @@ if __name__ == "__main__":
     config_rl = parser.parse_args()
 
     local_steps_per_epoch = 1000
-    state_dim = int(6 ** 3 // 4 * 4 + 4 * 5)
+    state_dim = int(6 ** 3 // 4 * 4 + 4 * 5) + 1
     print("state_dim:", state_dim)
     env = State(state_dim)
     # exit()
     action_dim = 54
     agent = Agent(state_dim, action_dim, config_rl,steps_per_epoch=local_steps_per_epoch)
     if config_rl.load:
-        agent.load_model()
+        #agent.load_model(name='model-199999')
         print("load")
 
     if config_rl.eval:
@@ -327,7 +365,8 @@ if __name__ == "__main__":
     #
 
     # Results
-    waiting_list = [chain.waitingTime if chain.finish_time is not None else cfg.SIMU_TIME for chain in chains]
+    #waiting_list = [chain.waitingTime if chain.finish_time is not None else cfg.SIMU_TIME for chain in chains]
+    waiting_list = [chain.waitingTime for chain in chains if chain.finish_time != None]
     print(waiting_list)
     print("Average waiting time is ", len(waiting_list), sum(waiting_list) / len(waiting_list))
 

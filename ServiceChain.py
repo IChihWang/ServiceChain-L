@@ -121,7 +121,7 @@ def PoissonGenChains(k, arrival_rate, service_rate):
             functs.append(ServiceFunction(CPU_req, MEM_req, BW_req))
 
         service_time = expovariate(service_rate)*(1/cfg.TIME_STEP_PER_SECOND) + 1
-
+        #print("service time:", service_time)
         min_delay = 0
         server_num = 1
         agg_function = ServiceFunction(0,0,0)

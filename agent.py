@@ -208,10 +208,14 @@ class Agent():
         #self.saver.save(self.sess,  os.path.join(self.train_dir, 'model'))
         self.saver.save(self.sess, os.path.join(self.train_dir, 'model'), global_step =step)
 
-    def load_model(self):
+    def load_model(self, name=None):
         print("Load model")
         #self.saver.restore(self.sess, os.path.join(self.train_dir, 'model'))
-        self.saver.restore(self.sess, tf.train.latest_checkpoint(self.train_dir))
+        if name is not None:
+            print(os.path.join(self.train_dir, name))
+            self.saver.restore(self.sess, os.path.join(self.train_dir, name))
+        else:
+            self.saver.restore(self.sess, tf.train.latest_checkpoint(self.train_dir))
         print(tf.train.latest_checkpoint(self.train_dir))
         logger.info("Load ckpt: {}".format(tf.train.latest_checkpoint(self.train_dir)))
 

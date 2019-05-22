@@ -27,17 +27,20 @@ class State:
 
         tmp = np.vstack((self.server_state, self.chain_state))
         tmp = tmp.reshape(1,-1)
+        tmp = np.concatenate((tmp, np.array([[self.chain_waiting_time]])), axis=1)
+
 
         assert self.state_dim == tmp.shape[1]
         self.last_state = tmp
         return tmp   #[self.server_state, self.chain_state]
 
-    def construct_chain_state(self, chain_state):
+    def construct_chain_state(self, chain_state, waiting_time=0):
         # state of One chain's function
         mu = np.mean(chain_state)
         var = np.var(chain_state)
         #chain_state = (chain_state-mu)/var
         self.chain_state = chain_state
+        self.chain_waiting_time = waiting_time
         self.chain_state_ptr = 0
 
     def construct_normalize_reward(self, servers):
@@ -87,6 +90,11 @@ class State:
         #return np.sum(state)/100
 
         return np.sum(state) / 10
+
+    def wait_reward(self):
+
+        return 1.0/(self.chain_waiting_time+1)
+
 
 
     def update_server_max(self, servers):
@@ -712,6 +720,8 @@ class DataCenter:
                 print("resource Fail:", function_idx, server_idx)
                 #print("agent ptr", agent.buf.ptr)
                 reward = -0.5
+
+
             agent.buf.store(rl_state, a, reward, v_t, logp_t)
             terminal = agent.buf.is_full()
 
@@ -740,7 +750,9 @@ class DataCenter:
             # If deploy chain sucessfully
             self.chains.append(chain)
 
-            reward = env.norm2_reward(self.servers)
+            #reward = env.norm2_reward(self.servers)
+            reward = env.wait_reward()
+
             #logger.info("success reward: {}".format(reward))
             agent.buf.overwrite_last_rew(reward)
             env.ep_ret += reward
@@ -806,7 +818,7 @@ class DataCenter:
 
             # Agent predict  action
             a, v_t, logp_t = agent.sess.run(agent.get_action_ops, feed_dict={agent.x_ph: rl_state.reshape(1, -1)})
-            print("a:", a, logp_t)
+            #print("a:", a, logp_t)
             server_idx = a[0]
             env.step()
 
@@ -821,14 +833,16 @@ class DataCenter:
 
             else:
                 # Reject directly if latency requirement doesn't meet
-                print("Fail")
+                #print("Fail")
+                print("latency Fail:", function_idx, server_idx)
                 is_deployed = False
 
             # store
             if is_deployed:
                 reward = 0
             else:
-                print("Fail")
+                #print("Fail")
+                print("resource Fail:", function_idx, server_idx)
                 reward = -2
 
             if is_deployed:
@@ -870,7 +884,7 @@ class DataCenter:
 
             env.episode_counter += 1
 
-            print('Return:', env.ep_ret)
+            #print('Return:', env.ep_ret)
 
             env.reset()
 
