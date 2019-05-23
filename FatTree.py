@@ -93,7 +93,7 @@ class State:
 
     def wait_reward(self):
 
-        return 1.0/(self.chain_waiting_time+1)
+        return 2.0/(self.chain_waiting_time+1)
 
 
 
@@ -719,7 +719,7 @@ class DataCenter:
             else:
                 print("resource Fail:", function_idx, server_idx)
                 #print("agent ptr", agent.buf.ptr)
-                reward = -0.5
+                reward = -0.5/10
 
 
             agent.buf.store(rl_state, a, reward, v_t, logp_t)

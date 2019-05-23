@@ -87,7 +87,8 @@ def train():
             # start = time.time()
             # get_all_func(event_list[t_idx]['queue'])123
             # get_all_func(event_list[t_idx]['arrive'])
-
+            if np.random.uniform(0,1)>0.5:
+                break
             # end = time.time()
             # print("time:", end-start)
             for chain in (event_list[t_idx]['queue']):
@@ -95,7 +96,7 @@ def train():
                 env.construct_chain_state(chain_state, chain.waitingTime)
 
                 ##
-                if chain == event_list[t_idx]['queue'][-1] and not event_list[t_idx]['arrive']:
+                if chain == event_list[t_idx]['queue'][-1] and not event_list[t_idx]['arrive'] and (t_idx%10 ==0 or t_idx==len(event_list)) :
                     env.is_last_in_time= True
                     #print("last!")
 
@@ -128,7 +129,7 @@ def train():
                 chain_state = get_func_in_chain(chain)
                 env.construct_chain_state(chain_state, chain.waitingTime)
 
-                if chain == event_list[t_idx]['arrive'][-1]:
+                if chain == event_list[t_idx]['arrive'][-1] and (t_idx%10 ==0 or t_idx==len(event_list)) :
                     env.is_last_in_time = True
                     #print("last!!")
 
